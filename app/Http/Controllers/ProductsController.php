@@ -5,6 +5,8 @@ use App\Http\Resources\ProductResource;
 use App\Models\Product;
 
 use Illuminate\Http\Request;
+use DataTables;
+use DNS1D;
 
 class ProductsController extends Controller
 {
@@ -18,20 +20,42 @@ class ProductsController extends Controller
         return response($response, 200);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
+    public function getProducts()
+    {
+        if (request()->ajax()) {
+            $products = Product::orderBy('id', 'desc')->get();
+
+            return DataTables::of($products)
+                ->addColumn('action', function ($row) {
+                    $html = '<div class="btn-group">
+                        <button type="button" class="badge btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Action</button>
+                        <div class="dropdown-menu dropdown-menu-right">
+                            <a class="dropdown-item edit-button" data-action="' . url('allowances/editAllowance', [$row->id]) . '" href="#"><i class="fa fa-pencil m-r-5"></i> Edit</a>
+                            <a class="dropdown-item delete-button" data-action="' . url('allowances/delete_allowance', [$row->id]) . '" href="#"><i class="fa fa-trash-o m-r-5"></i> Delete</a>
+                        </div>
+                    </div>';
+
+                    return $html;
+                })
+                ->editColumn('product_code', function ($row) {
+                    $barcodeHTML = DNS1D::getBarcodeHTML($row->product_code, 'CODABAR', 2, 33);
+                    return $barcodeHTML . ' p - ' . $row->product_code;
+                })
+                ->rawColumns(['action', 'product_code'])
+                ->make(true);
+        }
+        return view('products.index');
+    }
+
     public function create()
     {
         //
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         $product_name = $request->input('name');
+        $category = $request->input('category');
         $product_price = $request->input('price');
         $product_description = $request->input('description');
 
@@ -44,6 +68,7 @@ class ProductsController extends Controller
 
         $product = Product::create([
             'name' => $product_name,
+            'category' => $category,
             'price' => $product_price,
             'product_code' => $number,
             'description' => $product_description,
@@ -76,11 +101,13 @@ class ProductsController extends Controller
     {
         $product_name = $request->input('name');
         $product_price = $request->input('price');
+        $category = $request->input('category');
         $product_description = $request->input('description');
 
         $product->update([
             'name' => $product_name,
             'price' => $product_price,
+            'category' => $category,
             'description' => $product_description,
         ]);
         return response()->json([
@@ -88,13 +115,10 @@ class ProductsController extends Controller
         ], 200);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Product $product)
     {
         $product->delete();
-        return response()->json(null,204);
+        return response()->json(null, 204);
     }
 
     public function productCodeExists($number)
